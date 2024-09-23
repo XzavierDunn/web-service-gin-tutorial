@@ -1,6 +1,9 @@
 package main
 
 import (
+	"example/web-service-gin/db"
+	"example/web-service-gin/middleware"
+	"example/web-service-gin/models"
 	"log"
 	"net/http"
 
@@ -8,24 +11,12 @@ import (
 	"github.com/google/uuid"
 )
 
-type album struct {
-	ID     uuid.UUID `json:"id"`
-	Title  string    `json:"title"`
-	Artist string    `json:"artist"`
-	Price  float32   `json:"price"`
-}
-
-var albums = []album{
-	{ID: uuid.New(), Title: "Blue Train", Artist: "John Coltrane", Price: 56.99},
-	{ID: uuid.New(), Title: "Jeru", Artist: "Gerry Mulligan", Price: 17.99},
-	{ID: uuid.New(), Title: "Sarah Vaughan and Clifford Brown", Artist: "Sarah Vaughan", Price: 39.99},
-}
-
 func main() {
 	log.SetPrefix("GIN API: ")
 	log.SetFlags(log.LstdFlags)
 
 	router := gin.Default()
+	router.Use(middleware.LogRequest)
 	router.GET("/albums", getAlbums)
 	router.GET("/albums/:id", fetchAlbum)
 	router.POST("/albums", postAlbum)
@@ -33,13 +24,7 @@ func main() {
 	router.Run("localhost:8080")
 }
 
-func logRequest(request *http.Request) {
-	log.Println("Recieved request")
-	log.Printf(`Method: %v`, request.Method)
-	log.Printf(`Path: %v`, request.URL)
-}
-
-func validateAlbum(album album) (bool, string) {
+func validateAlbum(album models.Album) (bool, string) {
 	if album.Artist == "" {
 		return false, "Missing Artist"
 	}
@@ -56,13 +41,11 @@ func validateAlbum(album album) (bool, string) {
 }
 
 func getAlbums(c *gin.Context) {
-	logRequest(c.Request)
-	c.IndentedJSON(http.StatusOK, albums)
+	c.IndentedJSON(http.StatusOK, db.GetAlbums())
 }
 
 func postAlbum(c *gin.Context) {
-	logRequest(c.Request)
-	var newAlbum album
+	var newAlbum models.Album
 
 	if err := c.BindJSON(&newAlbum); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "invalid request body"})
@@ -76,7 +59,7 @@ func postAlbum(c *gin.Context) {
 	}
 
 	newAlbum.ID = uuid.New()
-	albums = append(albums, newAlbum)
+	db.CreateAlbum(newAlbum)
 
 	log.Printf("Saved album: %v", newAlbum.ID)
 
@@ -84,22 +67,19 @@ func postAlbum(c *gin.Context) {
 }
 
 func fetchAlbum(c *gin.Context) {
-	logRequest(c.Request)
-
-	idParam := c.Param("id")
-
-	id, err := uuid.Parse(idParam)
+	// TODO: FIX
+	_, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "invalid ID"})
 		return
 	}
 
-	for _, album := range albums {
-		if album.ID == id {
-			c.IndentedJSON(http.StatusOK, album)
-			return
-		}
-	}
+	// for _, album := range albums {
+	// 	if album.ID == id {
+	// 		c.IndentedJSON(http.StatusOK, album)
+	// 		return
+	// 	}
+	// }
 
 	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "album not found"})
 }
