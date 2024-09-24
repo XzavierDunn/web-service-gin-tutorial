@@ -41,7 +41,12 @@ func validateAlbum(album models.Album) (bool, string) {
 }
 
 func getAlbums(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, db.GetAlbums())
+	albums, err := db.GetAlbums()
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "issue fetching albums"})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, albums)
 }
 
 func postAlbum(c *gin.Context) {
@@ -58,8 +63,11 @@ func postAlbum(c *gin.Context) {
 		return
 	}
 
-	newAlbum.ID = uuid.New()
-	db.CreateAlbum(newAlbum)
+	newAlbum.ID = uuid.NewString()
+	if err := db.CreateAlbum(newAlbum); err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "issue creating album"})
+		return
+	}
 
 	log.Printf("Saved album: %v", newAlbum.ID)
 
