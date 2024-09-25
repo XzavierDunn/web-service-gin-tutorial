@@ -78,13 +78,15 @@ func fetchAlbum(c *gin.Context) {
 		return
 	}
 
-	// TODO: FIX
 	album, err := db.GetSingleAlbum(id)
 	if err != nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "error fetching album"})
+		msg := "error fetching album"
+		if err.Error() == "album not found" {
+			msg = err.Error()
+		}
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
 	}
 
-	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "album not found"})
 	c.IndentedJSON(http.StatusOK, album)
 }

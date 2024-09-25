@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 	"time"
 	"web-service-gin/logger"
@@ -98,7 +99,8 @@ func createAlbumTable() error {
 	return nil
 }
 
-func checkIfTableExists() error {
+// checkIfTableExists
+func _() error {
 	svc := getDynamoSession()
 	response, err := svc.DescribeTable(&dynamodb.DescribeTableInput{
 		TableName: aws.String(tablename),
@@ -192,6 +194,10 @@ func GetSingleAlbum(id string) (models.Album, error) {
 	if err != nil {
 		log.Errorf("Error fetching item: %s", err)
 		return album, err
+	}
+
+	if result.Item == nil {
+		return album, errors.New("album not found")
 	}
 
 	err = dynamodbattribute.UnmarshalMap(result.Item, &album)
