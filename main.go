@@ -1,19 +1,17 @@
 package main
 
 import (
-	"example/web-service-gin/db"
-	"example/web-service-gin/middleware"
-	"example/web-service-gin/models"
-	"log"
 	"net/http"
+	"web-service-gin/db"
+	"web-service-gin/middleware"
+	"web-service-gin/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 func main() {
-	log.SetPrefix("GIN API: ")
-	log.SetFlags(log.LstdFlags)
+	// db.InitTableWithData()
 
 	router := gin.Default()
 	router.Use(middleware.LogRequest)
@@ -69,25 +67,24 @@ func postAlbum(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Saved album: %v", newAlbum.ID)
-
 	c.IndentedJSON(http.StatusCreated, newAlbum)
 }
 
 func fetchAlbum(c *gin.Context) {
-	// TODO: FIX
-	_, err := uuid.Parse(c.Param("id"))
+	id := c.Param("id")
+	_, err := uuid.Parse(id)
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "invalid ID"})
 		return
 	}
 
-	// for _, album := range albums {
-	// 	if album.ID == id {
-	// 		c.IndentedJSON(http.StatusOK, album)
-	// 		return
-	// 	}
-	// }
+	// TODO: FIX
+	album, err := db.GetSingleAlbum(id)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "error fetching album"})
+		return
+	}
 
 	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "album not found"})
+	c.IndentedJSON(http.StatusOK, album)
 }

@@ -1,11 +1,13 @@
 package db
 
 import (
-	"example/web-service-gin/models"
 	"fmt"
-	"log"
+	"time"
+	"web-service-gin/logger"
+	"web-service-gin/models"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
@@ -13,6 +15,8 @@ import (
 )
 
 var tablename = "Web-Service-Gin-Tutorial-Albums"
+
+var log = logger.GetLogger()
 
 func getDynamoSession() *dynamodb.DynamoDB {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -30,19 +34,29 @@ func createSampleDataRecords() {
 	}
 
 	for _, album := range albums {
-		CreateAlbum(album)
+		err := CreateAlbum(album)
+		for err != nil {
+			// type assertion https://go.dev/tour/methods/15
+			aerr, ok := err.(awserr.Error)
+			if !ok {
+				log.Fatal("err.(awserr.Error) is not awserr.Error")
+			}
+
+			if aerr.Code() == dynamodb.ErrCodeResourceNotFoundException {
+				log.Error("Table is unavailable ... waiting 5 seconds")
+				time.Sleep(5 * time.Second)
+				log.Info("Retrying sample data creation")
+				err = CreateAlbum(album)
+			}
+		}
 	}
 }
 
-func createAlbumTable() {
+func createAlbumTable() error {
 	input := &dynamodb.CreateTableInput{
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
 				AttributeName: aws.String("id"),
-				AttributeType: aws.String("S"),
-			},
-			{
-				AttributeName: aws.String("title"),
 				AttributeType: aws.String("S"),
 			},
 		},
@@ -50,10 +64,6 @@ func createAlbumTable() {
 			{
 				AttributeName: aws.String("id"),
 				KeyType:       aws.String("HASH"),
-			},
-			{
-				AttributeName: aws.String("title"),
-				KeyType:       aws.String("RANGE"),
 			},
 		},
 		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
@@ -80,14 +90,33 @@ func createAlbumTable() {
 	svc := getDynamoSession()
 	_, err := svc.CreateTable(input)
 	if err != nil {
-		log.Fatalf("Got error calling CreateTable: %s", err)
+		log.Errorf("Got error calling CreateTable: %s", err)
+		return err
 	}
 
 	fmt.Println("Created Albums table: ", tablename)
+	return nil
+}
+
+func checkIfTableExists() error {
+	svc := getDynamoSession()
+	response, err := svc.DescribeTable(&dynamodb.DescribeTableInput{
+		TableName: aws.String(tablename),
+	})
+	if err != nil {
+		log.Errorf("Error describing table: %s", err)
+		return err
+	}
+
+	log.Infof("Found: %v", response.Table.TableName)
+	return nil
 }
 
 func InitTableWithData() {
-	createAlbumTable()
+	err := createAlbumTable()
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
 	createSampleDataRecords()
 }
 
@@ -99,7 +128,7 @@ func GetAlbums() ([]models.Album, error) {
 		TableName: &tablename,
 	})
 	if err != nil {
-		log.Printf("Query API call failed: %s", err)
+		log.Errorf("Query API call failed: %s", err)
 		return albums, err
 	}
 
@@ -107,7 +136,7 @@ func GetAlbums() ([]models.Album, error) {
 		album := models.Album{}
 		err = dynamodbattribute.UnmarshalMap(item, &album)
 		if err != nil {
-			log.Printf("Got error unmarshalling: %s", err)
+			log.Errorf("Got error unmarshalling: %s", err)
 			return albums, err
 		}
 
@@ -119,27 +148,57 @@ func GetAlbums() ([]models.Album, error) {
 
 func CreateAlbum(album models.Album) error {
 	svc := getDynamoSession()
-	av, err := dynamodbattribute.MarshalMap(models.Album{
+	item, err := dynamodbattribute.MarshalMap(models.Album{
 		ID:     album.ID,
 		Title:  album.Title,
 		Artist: album.Artist,
 		Price:  album.Price,
 	})
 	if err != nil {
-		log.Printf("Got error marshalling new album: %s", err)
+		log.Errorf("Got error marshalling new album: %s", err)
 		return err
 	}
 
 	input := &dynamodb.PutItemInput{
-		Item:      av,
+		Item:      item,
 		TableName: aws.String(tablename),
 	}
 
 	_, err = svc.PutItem(input)
 	if err != nil {
-		log.Printf("Got error calling PutItem: %s", err)
+		log.Errorf("Got error calling PutItem: %s", err)
 		return err
 	}
 
+	log.Infof("Saved album: %s", album.ID)
 	return nil
+}
+
+func GetSingleAlbum(id string) (models.Album, error) {
+	album := models.Album{}
+	inputKey := map[string]*dynamodb.AttributeValue{
+		"id": {
+			S: aws.String(id),
+		},
+	}
+
+	svc := getDynamoSession()
+	input := &dynamodb.GetItemInput{
+		Key:       inputKey,
+		TableName: &tablename,
+	}
+
+	result, err := svc.GetItem(input)
+	if err != nil {
+		log.Errorf("Error fetching item: %s", err)
+		return album, err
+	}
+
+	err = dynamodbattribute.UnmarshalMap(result.Item, &album)
+	if err != nil {
+		log.Errorf("Error unmarshalling item: %s", err)
+		return album, err
+	}
+
+	return album, nil
 }

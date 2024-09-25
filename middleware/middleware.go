@@ -1,15 +1,14 @@
 package middleware
 
 import (
-	"log"
+	"web-service-gin/logger"
 
 	"github.com/gin-gonic/gin"
 )
 
-func LogRequest(c *gin.Context) {
-	log.Println("Recieved request")
-	log.Printf(`Method: %v`, c.Request.Method)
-	log.Printf(`Path: %v`, c.Request.URL)
+var log = logger.GetLogger()
 
+func LogRequest(c *gin.Context) {
+	log.Infof(`Recieved request => Method: %v, Path: %v`, c.Request.Method, c.Request.URL)
 	c.Next()
 }
