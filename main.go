@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"web-service-gin/db"
-	"web-service-gin/middleware"
 	"web-service-gin/models"
 
 	"github.com/gin-gonic/gin"
@@ -14,10 +13,10 @@ func main() {
 	// db.InitTableWithData()
 
 	router := gin.Default()
-	router.Use(middleware.LogRequest)
 	router.GET("/albums", getAlbums)
-	router.GET("/albums/:id", fetchAlbum)
 	router.POST("/albums", postAlbum)
+	router.GET("/albums/:id", fetchAlbum)
+	router.DELETE("/albums/:id", deleteAlbum)
 
 	router.Run("localhost:8080")
 }
@@ -89,4 +88,21 @@ func fetchAlbum(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, album)
+}
+
+func deleteAlbum(c *gin.Context) {
+	id := c.Param("id")
+	_, err := uuid.Parse(id)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "invalid ID"})
+		return
+	}
+
+	err = db.DeleteAlbum(id)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Deleted"})
 }

@@ -208,3 +208,30 @@ func GetSingleAlbum(id string) (models.Album, error) {
 
 	return album, nil
 }
+
+func DeleteAlbum(id string) error {
+	svc := getDynamoSession()
+	inputKey := map[string]*dynamodb.AttributeValue{
+		"id": {
+			S: aws.String(id),
+		},
+	}
+
+	input := &dynamodb.DeleteItemInput{
+		Key:          inputKey,
+		ReturnValues: aws.String("ALL_OLD"),
+		TableName:    &tablename,
+	}
+
+	result, err := svc.DeleteItem(input)
+	if err != nil {
+		log.Errorf("Error deleting album: %s", err)
+		return errors.New("error deleting album")
+	}
+
+	if result.Attributes == nil {
+		return errors.New("album does not exist")
+	}
+
+	return nil
+}
