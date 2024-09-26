@@ -3,6 +3,7 @@ package db
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 	"web-service-gin/logger"
 	"web-service-gin/models"
@@ -17,6 +18,24 @@ import (
 
 var tablename = "Web-Service-Gin-Tutorial-Albums"
 
+var albums = []models.Album{
+	{ID: uuid.NewString(), Title: "Blue Train", Artist: "John Coltrane", Price: 56.99},
+	{ID: uuid.NewString(), Title: "Jeru", Artist: "Gerry Mulligan", Price: 17.99},
+	{ID: uuid.NewString(), Title: "Sarah Vaughan and Clifford Brown", Artist: "Sarah Vaughan", Price: 39.99},
+	{ID: uuid.NewString(), Title: "Kind of Blue", Artist: "Miles Davis", Price: 45.99},
+	{ID: uuid.NewString(), Title: "A Love Supreme", Artist: "John Coltrane", Price: 59.99},
+	{ID: uuid.NewString(), Title: "Time Out", Artist: "The Dave Brubeck Quartet", Price: 29.99},
+	{ID: uuid.NewString(), Title: "Giant Steps", Artist: "John Coltrane", Price: 44.99},
+	{ID: uuid.NewString(), Title: "The Shape of Jazz to Come", Artist: "Ornette Coleman", Price: 23.99},
+	{ID: uuid.NewString(), Title: "Out to Lunch!", Artist: "Eric Dolphy", Price: 37.99},
+	{ID: uuid.NewString(), Title: "Mingus Ah Um", Artist: "Charles Mingus", Price: 34.99},
+	{ID: uuid.NewString(), Title: "Getz/Gilberto", Artist: "Stan Getz & João Gilberto", Price: 28.99},
+	{ID: uuid.NewString(), Title: "Moanin'", Artist: "Art Blakey & The Jazz Messengers", Price: 31.99},
+	{ID: uuid.NewString(), Title: "Speak No Evil", Artist: "Wayne Shorter", Price: 39.99},
+	{ID: uuid.NewString(), Title: "Somethin' Else", Artist: "Cannonball Adderley", Price: 36.99},
+	{ID: uuid.NewString(), Title: "The Black Saint and the Sinner Lady", Artist: "Charles Mingus", Price: 48.99},
+}
+
 var log = logger.GetLogger()
 
 func getDynamoSession() *dynamodb.DynamoDB {
@@ -28,29 +47,44 @@ func getDynamoSession() *dynamodb.DynamoDB {
 }
 
 func createSampleDataRecords() {
-	var albums = []models.Album{
-		{ID: uuid.NewString(), Title: "Blue Train", Artist: "John Coltrane", Price: 56.99},
-		{ID: uuid.NewString(), Title: "Jeru", Artist: "Gerry Mulligan", Price: 17.99},
-		{ID: uuid.NewString(), Title: "Sarah Vaughan and Clifford Brown", Artist: "Sarah Vaughan", Price: 39.99},
+	err := CreateAlbum(albums[0])
+	checkAvailable(err)
+
+	// Promise.allSettled([for album of albums {createAlbum(album)}])
+	var waitGroup sync.WaitGroup
+	for _, album := range albums[1:] {
+		waitGroup.Add(1)
+
+		go func(album models.Album) {
+			defer waitGroup.Done()
+			CreateAlbum(album)
+		}(album)
 	}
 
-	for _, album := range albums {
-		err := CreateAlbum(album)
-		for err != nil {
-			// type assertion https://go.dev/tour/methods/15
-			aerr, ok := err.(awserr.Error)
-			if !ok {
-				log.Fatal("err.(awserr.Error) is not awserr.Error")
-			}
+	waitGroup.Wait()
+}
 
-			if aerr.Code() == dynamodb.ErrCodeResourceNotFoundException {
-				log.Error("Table is unavailable ... waiting 5 seconds")
-				time.Sleep(5 * time.Second)
-				log.Info("Retrying sample data creation")
-				err = CreateAlbum(album)
-			}
+func checkAvailable(err error) error {
+	retries := 0
+	for err != nil {
+		if retries > 3 {
+			log.Fatal("retired three times...")
+		}
+
+		aerr, ok := err.(awserr.Error)
+		if !ok {
+			log.Fatal("err.(awserr.Error) is not awserr.Error")
+		}
+
+		if aerr.Code() == dynamodb.ErrCodeResourceNotFoundException {
+			log.Error("Table is unavailable ... waiting 5 seconds")
+			time.Sleep(5 * time.Second)
+			log.Info("Checking...")
+			err = CreateAlbum(albums[0])
 		}
 	}
+
+	return nil
 }
 
 func createAlbumTable() error {
