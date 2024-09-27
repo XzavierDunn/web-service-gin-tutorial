@@ -6,3 +6,7 @@ type Album struct {
 	Artist string  `json:"artist"`
 	Price  float32 `json:"price"`
 }
+
+type Response struct {
+	Message string `json:"message"`
+}
