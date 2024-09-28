@@ -157,7 +157,7 @@ func InitTableWithData() {
 }
 
 func GetAlbums() ([]models.Album, error) {
-	var albums []models.Album
+	albums := make([]models.Album, 0)
 	svc := getDynamoSession()
 
 	result, err := svc.Scan(&dynamodb.ScanInput{
