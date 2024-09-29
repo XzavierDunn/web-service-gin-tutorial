@@ -72,14 +72,25 @@ func NewWebServiceGinTutorialStack(scope constructs.Construct, id string, props 
 		Role:        albumLambdaRole,
 	})
 
+	albumLambdaIntegration := awsapigateway.NewLambdaIntegration(albumLambda, &awsapigateway.LambdaIntegrationOptions{})
+
 	api := awsapigateway.NewLambdaRestApi(stack, jsii.String("web-service-api"), &awsapigateway.LambdaRestApiProps{
 		Handler: albumLambda,
+		Proxy:   jsii.Bool(false),
 	})
 
+	sampleDataResource := api.Root().AddResource(jsii.String("sample-data"), &awsapigateway.ResourceOptions{})
+	sampleDataResource.AddMethod(jsii.String("GET"), albumLambdaIntegration, &awsapigateway.MethodOptions{})
+
 	albumsResource := api.Root().AddResource(jsii.String("albums"), &awsapigateway.ResourceOptions{})
-	albumsResource.AddProxy(&awsapigateway.ProxyResourceOptions{
-		DefaultIntegration: awsapigateway.NewLambdaIntegration(albumLambda, &awsapigateway.LambdaIntegrationOptions{}),
-	})
+
+	albumsResource.AddMethod(jsii.String("GET"), albumLambdaIntegration, &awsapigateway.MethodOptions{})
+	albumsResource.AddMethod(jsii.String("POST"), albumLambdaIntegration, &awsapigateway.MethodOptions{})
+
+	albumByIdResource := albumsResource.AddResource(jsii.String("{id}"), &awsapigateway.ResourceOptions{})
+
+	albumByIdResource.AddMethod(jsii.String("GET"), albumLambdaIntegration, &awsapigateway.MethodOptions{})
+	albumByIdResource.AddMethod(jsii.String("DELETE"), albumLambdaIntegration, &awsapigateway.MethodOptions{})
 
 	awscdk.NewCfnOutput(stack, jsii.String("api-gateway-endpoint"), &awscdk.CfnOutputProps{
 		ExportName: jsii.String("API-Gateway-Endpoint"),
