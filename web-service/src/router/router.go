@@ -1,13 +1,14 @@
 package router
 
 import (
-	"web-service-gin/src/albums"
+	"function/src/albums"
 
 	"github.com/gin-gonic/gin"
 )
 
 func SetupRouter() *gin.Engine {
 	router := gin.Default()
+	router.GET("/sample-data", albums.CreateSampleData)
 	router.GET("/albums", albums.GetAlbums)
 	router.POST("/albums", albums.PostAlbum)
 	router.GET("/albums/:id", albums.FetchAlbum)

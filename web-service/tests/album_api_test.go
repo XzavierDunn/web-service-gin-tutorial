@@ -3,11 +3,11 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"function/models"
+	"function/src/router"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"web-service-gin/models"
-	"web-service-gin/src/router"
 
 	"github.com/stretchr/testify/assert"
 )

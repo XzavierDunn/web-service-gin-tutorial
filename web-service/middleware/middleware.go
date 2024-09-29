@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"web-service-gin/logger"
+	"function/logger"
 
 	"github.com/gin-gonic/gin"
 )

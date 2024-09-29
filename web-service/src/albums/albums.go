@@ -1,9 +1,9 @@
 package albums
 
 import (
+	"function/db"
+	"function/models"
 	"net/http"
-	"web-service-gin/db"
-	"web-service-gin/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,6 +23,11 @@ func validateAlbum(album models.Album) (bool, string) {
 	}
 
 	return true, ""
+}
+
+func CreateSampleData(c *gin.Context) {
+	db.CreateSampleDataRecords()
+	c.IndentedJSON(http.StatusOK, nil)
 }
 
 func GetAlbums(c *gin.Context) {

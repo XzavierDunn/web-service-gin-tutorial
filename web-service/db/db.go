@@ -3,10 +3,11 @@ package db
 import (
 	"errors"
 	"fmt"
+	"function/logger"
+	"function/models"
+	"os"
 	"sync"
 	"time"
-	"web-service-gin/logger"
-	"web-service-gin/models"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -16,7 +17,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var tablename = "Web-Service-Gin-Tutorial-Albums"
+var tablename = os.Getenv("TABLE_NAME")
 
 var albums = []models.Album{
 	{ID: uuid.NewString(), Title: "Blue Train", Artist: "John Coltrane", Price: 56.99},
@@ -46,7 +47,7 @@ func getDynamoSession() *dynamodb.DynamoDB {
 	return dynamodb.New(sess)
 }
 
-func createSampleDataRecords() {
+func CreateSampleDataRecords() {
 	err := CreateAlbum(albums[0])
 	checkAvailable(err)
 
@@ -153,7 +154,7 @@ func InitTableWithData() {
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
-	createSampleDataRecords()
+	CreateSampleDataRecords()
 }
 
 func GetAlbums() ([]models.Album, error) {
@@ -184,7 +185,9 @@ func GetAlbums() ([]models.Album, error) {
 
 func CreateAlbum(album models.Album) error {
 	svc := getDynamoSession()
-	item, err := dynamodbattribute.MarshalMap(models.Album{
+	item, err := dynamodbattribute.MarshalMap(models.AlbumRecord{
+		PK:     "album#" + album.ID,
+		SK:     album.Artist,
 		ID:     album.ID,
 		Title:  album.Title,
 		Artist: album.Artist,
@@ -213,8 +216,8 @@ func CreateAlbum(album models.Album) error {
 func GetSingleAlbum(id string) (models.Album, error) {
 	album := models.Album{}
 	inputKey := map[string]*dynamodb.AttributeValue{
-		"id": {
-			S: aws.String(id),
+		"pk": {
+			S: aws.String("album#" + id),
 		},
 	}
 
@@ -245,9 +248,19 @@ func GetSingleAlbum(id string) (models.Album, error) {
 
 func DeleteAlbum(id string) error {
 	svc := getDynamoSession()
+	sk, err := GetSingleAlbum(id)
+	// TODO: Refactor
+	if err != nil {
+		log.Errorf("Error deleting album: %s", err)
+		return errors.New("error deleting album")
+	}
+
 	inputKey := map[string]*dynamodb.AttributeValue{
-		"id": {
-			S: aws.String(id),
+		"pk": {
+			S: aws.String("album#" + id),
+		},
+		"sk": {
+			S: aws.String(sk.ID),
 		},
 	}
 
